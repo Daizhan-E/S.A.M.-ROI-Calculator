@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S.A.M. ROI Calculator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center py-10 px-4">
+
+  <!-- Title -->
+  <h1 class="text-center text-3xl font-bold mb-8 tracking-wide text-teal-400">🔧 Renewed Robotics</h1>
+  <h2 class="text-center text-2xl font-semibold mb-6">S.A.M. ROI & Revenue Calculator</h2>
+
+  <!-- Grid Container -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-5xl">
+
+    <!-- Rental Income Card -->
+    <div class="bg-gray-800 rounded-xl shadow-lg p-6 space-y-4">
+      <h3 class="text-xl font-semibold text-teal-300">Rental Income</h3>
+      <label class="block">
+        <span>Initial Cost ($)</span>
+        <input id="rentalInitial" type="number" class="mt-1 block w-full bg-gray-700 text-white rounded-md p-2" />
+      </label>
+      <label class="block">
+        <span>Daily Rental Rate ($)</span>
+        <input id="dailyRate" type="number" class="mt-1 block w-full bg-gray-700 text-white rounded-md p-2" />
+      </label>
+      <label class="block">
+        <span>Days Rented per Month</span>
+        <input id="rentalDays" type="number" class="mt-1 block w-full bg-gray-700 text-white rounded-md p-2" />
+      </label>
+      <label class="block">
+        <span>Monthly Operating Costs ($)</span>
+        <input id="rentalCosts" type="number" class="mt-1 block w-full bg-gray-700 text-white rounded-md p-2" />
+      </label>
+
+      <div class="pt-4 border-t border-gray-600 space-y-1 text-sm">
+        <p><strong>Monthly Net Revenue:</strong> $<span id="rentalMonthly">0</span></p>
+        <p><strong>Yearly Net Revenue:</strong> $<span id="rentalYearly">0</span></p>
+        <p><strong>Months to ROI:</strong> <span id="rentalROI">—</span></p>
+      </div>
+    </div>
+
+    <!-- Excess Electricity Card -->
+    <div class="bg-gray-800 rounded-xl shadow-lg p-6 space-y-4">
+      <h3 class="text-xl font-semibold text-teal-300">Excess Electricity</h3>
+      <label class="block">
+        <span>kWh per Day</span>
+        <input id="kwhPerDay" type="number" class="mt-1 block w-full bg-gray-700 text-white rounded-md p-2" />
+      </label>
+      <label class="block">
+        <span>Days Sold per Month</span>
+        <input id="sellDays" type="number" class="mt-1 block w-full bg-gray-700 text-white rounded-md p-2" />
+      </label>
+      <label class="block">
+        <span>Sell‑Back Price ($/kWh)</span>
+        <input id="sellPrice" type="number" class="mt-1 block w-full bg-gray-700 text-white rounded-md p-2" />
+      </label>
+      <label class="block">
+        <span>Initial Cost ($)</span>
+        <input id="electricInitial" type="number" class="mt-1 block w-full bg-gray-700 text-white rounded-md p-2" />
+      </label>
+
+      <div class="pt-4 border-t border-gray-600 space-y-1 text-sm">
+        <p><strong>Monthly Revenue:</strong> $<span id="electricMonthly">0</span></p>
+        <p><strong>Yearly Revenue:</strong> $<span id="electricYearly">0</span></p>
+        <p><strong>Months to ROI:</strong> <span id="electricROI">—</span></p>
+      </div>
+    </div>
+
+    <!-- Total Revenue Card -->
+    <div class="md:col-span-2 bg-gray-800 rounded-xl shadow-lg p-6 space-y-4">
+      <h3 class="text-xl font-semibold text-teal-300">Total</h3>
+      <div class="space-y-1 text-sm">
+        <p><strong>Total Monthly Revenue:</strong> $<span id="totalMonthly">0</span></p>
+        <p><strong>Total Yearly Revenue:</strong> $<span id="totalYearly">0</span></p>
+        <p><strong>Months to Combined ROI:</strong> <span id="totalROI">—</span></p>
+      </div>
+    </div>
+
+    <!-- ROI Chart -->
+    <div class="md:col-span-2 bg-gray-800 rounded-xl shadow-lg p-6 text-center">
+      <h3 class="text-xl font-semibold text-teal-300 mb-4">ROI Payback Timeline</h3>
+      <canvas id="roiChart" class="w-full h-64 bg-gray-700 rounded-md"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const ids = [
+      "rentalInitial", "dailyRate", "rentalDays", "rentalCosts",
+      "kwhPerDay", "sellDays", "sellPrice", "electricInitial"
+    ];
+
+    ids.forEach(id => {
+      document.getElementById(id).addEventListener('input', calculate);
+    });
+
+    let chartInstance = null;
+
+    function calculate() {
+      const rentalInitial = parseFloat(document.getElementById('rentalInitial').value) || 0;
+      const dailyRate = parseFloat(document.getElementById('dailyRate').value) || 0;
+      const rentalDays = parseFloat(document.getElementById('rentalDays').value) || 0;
+      const rentalCosts = parseFloat(document.getElementById('rentalCosts').value) || 0;
+
+      const rentalGross = dailyRate * rentalDays;
+      const rentalMonthly = rentalGross - rentalCosts;
+      const rentalYearly = rentalMonthly * 12;
+      const rentalROI = rentalMonthly > 0 ? (rentalInitial / rentalMonthly).toFixed(1) : '—';
+
+      document.getElementById('rentalMonthly').textContent = rentalMonthly.toFixed(2);
+      document.getElementById('rentalYearly').textContent = rentalYearly.toFixed(2);
+      document.getElementById('rentalROI').textContent = rentalROI;
+
+      const kwhPerDay = parseFloat(document.getElementById('kwhPerDay').value) || 0;
+      const sellDays = parseFloat(document.getElementById('sellDays').value) || 0;
+      const sellPrice = parseFloat(document.getElementById('sellPrice').value) || 0;
+      const electricInitial = parseFloat(document.getElementById('electricInitial').value) || 0;
+
+      const electricMonthly = kwhPerDay * sellDays * sellPrice;
+      const electricYearly = electricMonthly * 12;
+      const electricROI = electricMonthly > 0 ? (electricInitial / electricMonthly).toFixed(1) : '—';
+
+      document.getElementById('electricMonthly').textContent = electricMonthly.toFixed(2);
+      document.getElementById('electricYearly').textContent = electricYearly.toFixed(2);
+      document.getElementById('electricROI').textContent = electricROI;
+
+      const totalMonthly = rentalMonthly + electricMonthly;
+      const totalYearly = rentalYearly + electricYearly;
+      const totalInitial = rentalInitial + electricInitial;
+      const totalROI = totalMonthly > 0 ? (totalInitial / totalMonthly).toFixed(1) : '—';
+
+      document.getElementById('totalMonthly').textContent = totalMonthly.toFixed(2);
+      document.getElementById('totalYearly').textContent = totalYearly.toFixed(2);
+      document.getElementById('totalROI').textContent = totalROI;
+
+      plotChart(totalMonthly, totalInitial);
+    }
+
+    function plotChart(totalMonthly, totalInitial) {
+      const months = Array.from({ length: 72 }, (_, i) => `Month ${i + 1}`);
+      let cumulativeRevenue = 0;
+      let cumulativePaidOff = 0;
+      const revenues = [];
+      const paidOff = [];
+
+      for (let i = 0; i < 72; i++) {
+        cumulativeRevenue += totalMonthly;
+        cumulativePaidOff = Math.min(totalInitial, cumulativeRevenue);
+        revenues.push(cumulativeRevenue);
+        paidOff.push(cumulativePaidOff);
+      }
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      const ctx = document.getElementById('roiChart').getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: months,
+          datasets: [
+            {
+              label: 'Cumulative Revenue',
+              data: revenues,
+              borderColor: '#4CAF50',
+              backgroundColor: 'rgba(76, 175, 80, 0.2)',
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: 'Paid Off Amount',
+              data: paidOff,
+              borderColor: '#FF5722',
+              backgroundColor: 'rgba(255, 87, 34, 0.2)',
+              fill: true,
+              tension: 0.4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            tooltip: {
+              callbacks: {
+                label: (context) => {
+                  return `$${context.raw.toFixed(2)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return `$${value.toFixed(2)}`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    calculate(); // Run once on load to initialize values.
+  </script>
+</body>
+</html>
